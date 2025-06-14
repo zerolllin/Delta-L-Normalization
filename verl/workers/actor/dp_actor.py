@@ -328,6 +328,10 @@ class DataParallelPPOActor(BasePPOActor):
     @GPUMemoryLogger(role="dp actor", logger=logger)
     def update_policy(self, data: DataProto):
         # make sure we are in training mode
+        use_dr_grpo = self.config.use_dr_grpo
+        use_grpopp = self.config.use_grpopp
+        grpopp_config = self.config.grpopp_config
+
         self.actor_module.train()
 
         temperature = data.meta_info["temperature"]  # temperature must be in the data.meta_info to avoid silent error
@@ -409,6 +413,9 @@ class DataParallelPPOActor(BasePPOActor):
                         cliprange_high=clip_ratio_high,
                         clip_ratio_c=clip_ratio_c,
                         loss_agg_mode=loss_agg_mode,
+                        use_dr_grpo=use_dr_grpo,
+                        use_grpopp=use_grpopp,
+                        grpopp_config=grpopp_config,
                     )
 
                     if entropy_coeff != 0:

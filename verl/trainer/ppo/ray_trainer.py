@@ -196,7 +196,8 @@ def compute_response_mask(data: DataProto):
     return attention_mask[:, -response_length:]
 
 
-def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_repeat=1, multi_turn=False, norm_adv_by_std_in_grpo=True, config=None):
+def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_repeat=1, multi_turn=False, norm_adv_by_std_in_grpo=True, config=None, 
+    use_dr_grpo=False, use_grpopp=False, grpopp_config={}):
     """Compute advantage estimates for policy optimization.
 
     This function computes advantage estimates using various estimators like GAE, GRPO, REINFORCE++, etc.
@@ -251,6 +252,9 @@ def compute_advantage(data: DataProto, adv_estimator, gamma=1.0, lam=1.0, num_re
             response_mask=grpo_calculation_mask,
             index=data.non_tensor_batch["uid"],
             norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
+            use_dr_grpo=use_dr_grpo,
+            use_grpopp=use_grpopp,
+            grpopp_config=grpopp_config,
         )
         data.batch["advantages"] = advantages
         data.batch["returns"] = returns
@@ -1073,7 +1077,14 @@ class RayPPOTrainer:
                             norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
                             multi_turn=self.config.actor_rollout_ref.rollout.multi_turn.enable,
                             config=self.config.algorithm,
+                            use_dr_grpo=self.config.algorithm.use_dr_grpo,
+                            use_grpopp=self.config.algorithm.use_grpopp,
+                            grpopp_config=self.config.algorithm.grpopp_config,
                         )
+                        assert sum([self.config.algorithm.use_dr_grpo, self.config.algorithm.use_grpopp]) <= 1
+                        assert self.config.algorithm.use_dr_grpo == self.config.actor_rollout_ref.actor.use_dr_grpo, "must be identical"
+                        assert self.config.algorithm.use_grpopp == self.config.actor_rollout_ref.actor.use_grpopp, "must be identical"
+                        assert dict(self.config.algorithm.grpopp_config) == dict(self.config.actor_rollout_ref.actor.grpopp_config), "must be identical"
 
                     # update critic
                     if self.use_critic:

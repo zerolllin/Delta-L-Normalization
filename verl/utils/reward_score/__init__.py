@@ -15,6 +15,7 @@
 
 from verl.utils.import_utils import deprecated
 
+first_time_of_open_reasoner_zero = True
 
 def default_compute_score(data_source, solution_str, ground_truth, extra_info=None, sandbox_fusion_url=None, concurrent_semaphore=None):
     """Compute the score for a given solution based on the data source.
@@ -36,6 +37,17 @@ def default_compute_score(data_source, solution_str, ground_truth, extra_info=No
         from . import gsm8k
 
         res = gsm8k.compute_score(solution_str, ground_truth)
+    elif data_source == "open_reasoner_zero" or data_source == "math500" or data_source == "aime2024" or data_source == "gpqa" or data_source == "minerva" or data_source == "amc":
+        global first_time_of_open_reasoner_zero
+        from . import open_reasoner_zero
+        if first_time_of_open_reasoner_zero:
+            # ensure latex work
+            assert open_reasoner_zero.compute_score("\\frac{3}{5}", "0.6", "open_reasoner_zero"), "The latex engine might not work please check"
+            first_time_of_open_reasoner_zero = False
+        res = open_reasoner_zero.compute_score(solution_str, ground_truth, data_source, extra_info=extra_info)
+    elif data_source == "countdown":
+        from . import countdown
+        res = countdown.compute_score(solution_str, ground_truth, format_score=0.)
     elif data_source in ["lighteval/MATH", "DigitalLearningGmbH/MATH-lighteval"]:
         from . import math
 

@@ -177,6 +177,9 @@ def compute_grpo_outcome_advantage(
     index: np.ndarray,
     epsilon: float = 1e-6,
     norm_adv_by_std_in_grpo: str = True,
+    use_dr_grpo=False,
+    use_grpopp=False,
+    grpopp_config={},
 ):
     """
     Compute advantage for GRPO, operating only on Outcome reward
@@ -198,6 +201,7 @@ def compute_grpo_outcome_advantage(
         Returns: `(torch.Tensor)`
             shape is (bs, response_length)
     """
+    assert sum([use_dr_grpo, use_grpopp]) <= 1
     scores = token_level_rewards.sum(dim=-1)
 
     id2score = defaultdict(list)
@@ -218,10 +222,25 @@ def compute_grpo_outcome_advantage(
             else:
                 raise ValueError(f"no score in prompt index: {idx}")
         for i in range(bsz):
-            if norm_adv_by_std_in_grpo:
+            if use_dr_grpo:
+                scores[i] = scores[i] - id2mean[index[i]]
+            elif norm_adv_by_std_in_grpo:
                 scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
             else:
                 scores[i] = scores[i] - id2mean[index[i]]
+
+        if use_grpopp:
+            valid_length_list = response_mask.sum(dim=1).detach().cpu().numpy().tolist()
+            mean_length = float(np.mean(valid_length_list))
+            length_reciprocal_list = []
+            for length in valid_length_list:
+                length_reciprocal_list.append(
+                    1 / ((length / mean_length) ** grpopp_config["alpha"])
+                )
+            length_reciprocal_mean = float(np.mean(length_reciprocal_list))
+            for i in range(bsz):
+                scores[i] = scores[i] * (length_reciprocal_list[i] / length_reciprocal_mean)
+
         scores = scores.unsqueeze(-1) * response_mask
 
     return scores, scores
@@ -540,6 +559,9 @@ def compute_policy_loss(
     cliprange_high=None,
     clip_ratio_c=3.0,
     loss_agg_mode: str = "token-mean",
+    use_dr_grpo=False, 
+    use_grpopp=False, 
+    grpopp_config={},
 ):
     """
     Compute the clipped policy objective and related metrics for PPO.
@@ -591,7 +613,11 @@ def compute_policy_loss(
     pg_clipfrac_lower = verl_F.masked_mean(torch.gt(clip_pg_losses1, pg_losses3) * (advantages < 0).float(), response_mask)
 
     pg_losses = torch.where(advantages < 0, clip_pg_losses2, clip_pg_losses1)
-    pg_loss = agg_loss(loss_mat=pg_losses, loss_mask=response_mask, loss_agg_mode=loss_agg_mode)
+
+    if use_dr_grpo or use_grpopp:
+        pg_loss = verl_F.masked_mean_allavg(pg_losses, response_mask)
+    else:
+        pg_loss = agg_loss(loss_mat=pg_losses, loss_mask=response_mask, loss_agg_mode=loss_agg_mode)
 
     return pg_loss, pg_clipfrac, ppo_kl, pg_clipfrac_lower
 

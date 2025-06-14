@@ -22,6 +22,8 @@ data:
   # Validation parquet. Can be a list or a single file.
   val_files: ~/data/rlhf/gsm8k/test.parquet
 
+  apply_chat_template: True
+
   # The field in the dataset where the prompt is located. Default is 'prompt'.
   prompt_key: prompt
 
@@ -277,6 +279,11 @@ actor_rollout_ref:
       # Only for FSDP1: FSDP1 configuration, prefetch the next forward-pass all-gather
       # before the current forward computation.
       forward_prefetch: False
+
+    use_dr_grpo: False
+    use_grpopp: False
+    grpopp_config:
+      alpha: 0.75
 
   # Reference model config.
   # Reference model will be enabled when actor.use_kl_loss or/and algorithm.use_kl_in_reward is/are True.
@@ -780,6 +787,11 @@ algorithm:
 
     # Power used for weight scaling in "pow" method
     weight_pow: 2.0
+
+  use_dr_grpo: False
+  use_grpopp: False
+  grpopp_config:
+    alpha: 0.75
 
 # config for the trainer
 trainer:

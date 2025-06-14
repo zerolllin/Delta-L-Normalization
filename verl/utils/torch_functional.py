@@ -178,6 +178,10 @@ def masked_mean(values, mask, axis=None):
     """
     return (values * mask).sum(axis=axis) / (mask.sum(axis=axis) + 1e-8)
 
+def masked_mean_allavg(values, mask):
+    """Compute mean of tensor with a masked values."""
+    return (values * mask).mean()
+
 
 def masked_var(values, mask, unbiased=True):
     """Compute variance of tensor with masked values."""

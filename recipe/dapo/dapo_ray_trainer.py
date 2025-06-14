@@ -260,7 +260,20 @@ class RayDAPOTrainer(RayPPOTrainer):
                             lam=self.config.algorithm.lam,
                             num_repeat=self.config.actor_rollout_ref.rollout.n,
                             norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
+                            config=self.config.algorithm,
+                            use_dr_grpo=self.config.algorithm.use_dr_grpo,
+                            use_grpopp=self.config.algorithm.use_grpopp,
+                            grpopp_config=self.config.algorithm.grpopp_config,
                         )
+                        assert sum([self.config.algorithm.use_dr_grpo, self.config.algorithm.use_grpopp]) <= 1
+                        assert self.config.algorithm.use_dr_grpo == self.config.actor_rollout_ref.actor.use_dr_grpo, "must be identical"
+                        assert self.config.algorithm.use_grpopp == self.config.actor_rollout_ref.actor.use_grpopp, "must be identical"
+                        assert dict(self.config.algorithm.grpopp_config) == dict(self.config.actor_rollout_ref.actor.grpopp_config), "must be identical"
+
+
+                    if self.config.algorithm.filter_overlong_response.enable:
+                        # filter overlong 就直接把他 advantage 变成 0
+                        batch.batch["advantages"][batch.batch["advantages"][:, -1] != 0] = 0.0
 
                     # update critic
                     if self.use_critic:

@@ -115,6 +115,7 @@ class RLHFDataset(Dataset):
         self.need_tools_kwargs = config.get("need_tools_kwargs", False)
         self.filter_prompts = config.get("filter_prompts", True)
         self.serialize_dataset = False
+        self.apply_chat_template = self.config.apply_chat_template
         self._download()
         self._read_files_and_tokenize()
 
@@ -139,11 +140,18 @@ class RLHFDataset(Dataset):
         if self.filter_overlong_prompts:
             tokenizer = self.tokenizer
             prompt_key = self.prompt_key
-            self.dataframe = self.dataframe.filter(
-                lambda doc: len(tokenizer.apply_chat_template(doc[prompt_key], add_generation_prompt=True)) <= self.max_prompt_length,
-                num_proc=self.num_workers,
-                desc=f"Filtering prompts longer than {self.max_prompt_length} tokens",
-            )
+            if self.apply_chat_template:
+                self.dataframe = self.dataframe.filter(
+                    lambda doc: len(tokenizer.apply_chat_template(doc[prompt_key], add_generation_prompt=True)) <= self.max_prompt_length,
+                    num_proc=self.num_workers,
+                    desc=f"Filtering prompts longer than {self.max_prompt_length} tokens",
+                )
+            else:
+                self.dataframe = self.dataframe.filter(
+                    lambda doc: len(tokenizer(doc[prompt_key])["input_ids"]) <= self.max_prompt_length,
+                    num_proc=self.num_workers,
+                    desc=f"Filtering prompts longer than {self.max_prompt_length} tokens",
+                )
 
             print(f"filter dataset len: {len(self.dataframe)}")
 
@@ -218,7 +226,11 @@ class RLHFDataset(Dataset):
             row_dict["multi_modal_inputs"].pop("second_per_grid_ts", None)
 
         else:
-            raw_prompt = self.tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+            if self.apply_chat_template:
+                raw_prompt = self.tokenizer.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+            else:
+                # some special tokens might be added here
+                raw_prompt = self.tokenizer.decode(self.tokenizer(messages)["input_ids"])
             model_inputs = self.tokenizer(raw_prompt, return_tensors="pt", add_special_tokens=False)
             input_ids = model_inputs.pop("input_ids")
             attention_mask = model_inputs.pop("attention_mask")
